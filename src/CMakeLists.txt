@@ -1,7 +1,9 @@
 
 set( unitguard_headers
      ConstexprAlgorithms.hpp
+     Unit.hpp
      UnitGuard.hpp
+     Quantity.hpp
    )
 
 set( unitguard_sources

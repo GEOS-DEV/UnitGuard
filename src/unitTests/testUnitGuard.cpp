@@ -4,26 +4,7 @@
 
 using namespace UnitGuard;
 
-TEST( UnitDimensionTests, Merge )
-{
-  // Suppose we merge "Length^1" into an empty unit:
-  using T1 = MergeUnits< Unit< >, Power< LengthTag, 1 > >::type;
-  // => Unit< Power<Length,1> >
-  static_assert( std::is_same< T1, Unit< Power< LengthTag, 1 > > >::value );
-
-  // Suppose we merge "Length^2" into Unit<Power<Length,1>, Power<Time,-1>>
-  using U2 = Unit< Power< LengthTag, 1 >, Power< TimeTag, -1 > >;
-  using T2 = MergeUnits< U2, Power< LengthTag , 2 > >::type;
-  // => Summation of exponents => Length^(1+2)=3 => Unit<Power<Length,3>, Power<Time,-1>>
-  static_assert( std::is_same< T2, Unit< Power< LengthTag, 3 >, Power< TimeTag, -1 > > >::value );
-
-  // Suppose we merge "Mass^1" into that => no matching base => mass is appended
-  using T3 = MergeUnits< T2, Power< MassTag, 1 > >::type;
-  // => Unit<Power<Length,3>, Power<Time,-1>, Power<Mass,1>>
-  static_assert( std::is_same< T3, Unit< Power< LengthTag, 3 >, Power< TimeTag, -1 >, Power< MassTag, 1 > > >::value);
-}
-
-TEST(UnitDimensionTests, BasicDimensions)
+TEST( UnitDimensionTests, BasicDimensions )
 {
   // Verify that dimensionless is empty
   static_assert(std::is_same< Dimensionless, Unit< > >::value, "Dimensionless should be Unit<>");
@@ -36,7 +17,7 @@ TEST(UnitDimensionTests, BasicDimensions)
   SUCCEED();
 }
 
-TEST(UnitDimensionTests, DerivedUnits)
+TEST( UnitDimensionTests, DerivedUnits )
 {
   // Check some derived units via static_assert
   // E.g. VelocityDimension = L^1 * T^-1
@@ -62,7 +43,26 @@ TEST(UnitDimensionTests, DerivedUnits)
   SUCCEED();
 }
 
-TEST(MetafunctionTests, MultiplyAndDivide)
+TEST( UnitDimensionTests, Merge )
+{
+  // Suppose we merge "Length^1" into an empty unit:
+  using T1 = MergeUnits< Unit< >, Power< LengthTag, 1 > >::type;
+  // => Unit< Power<Length,1> >
+  static_assert( std::is_same< T1, Unit< Power< LengthTag, 1 > > >::value );
+
+  // Suppose we merge "Length^2" into Unit<Power<Length,1>, Power<Time,-1>>
+  using U2 = Unit< Power< LengthTag, 1 >, Power< TimeTag, -1 > >;
+  using T2 = MergeUnits< U2, Power< LengthTag , 2 > >::type;
+  // => Summation of exponents => Length^(1+2)=3 => Unit<Power<Length,3>, Power<Time,-1>>
+  static_assert( std::is_same< T2, Unit< Power< LengthTag, 3 >, Power< TimeTag, -1 > > >::value );
+
+  // Suppose we merge "Mass^1" into that => no matching base => mass is appended
+  using T3 = MergeUnits< T2, Power< MassTag, 1 > >::type;
+  // => Unit<Power<Length,3>, Power<Time,-1>, Power<Mass,1>>
+  static_assert( std::is_same< T3, Unit< Power< LengthTag, 3 >, Power< TimeTag, -1 >, Power< MassTag, 1 > > >::value);
+}
+
+TEST( MetafunctionTests, MultiplyAndDivide )
 {
   // Multiply tests: L * T^-1 => VelocityDimension
   using Mul1 = typename Multiply< LengthDimension, Unit< Power< TimeTag, -1 > > >::type;
@@ -83,7 +83,7 @@ TEST(MetafunctionTests, MultiplyAndDivide)
 //------------------------------------------------------------------------------
 // Checking the Quantity<T, U> operations
 //------------------------------------------------------------------------------
-TEST(QuantityTests, BasicArithmetic)
+TEST( QuantityTests, BasicArithmetic )
 {
   // We'll use double for T, and e.g. LengthDimension for U
   Length< double > dist1 {2.5};
@@ -111,7 +111,7 @@ TEST(QuantityTests, BasicArithmetic)
   EXPECT_DOUBLE_EQ( static_cast<double>(ratio), 3.5 / 2.5 );
 }
 
-TEST(QuantityTests, CrossDimensionArithmetic)
+TEST( QuantityTests, CrossDimensionArithmetic )
 {
   // (Length) / (Time) => Velocity
   Length< double > len{10.0};
