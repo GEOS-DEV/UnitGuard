@@ -1,5 +1,6 @@
 
 set( unitguard_headers
+     ConstexprAlgorithms.hpp
      UnitGuard.hpp
    )
 

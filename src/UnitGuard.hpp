@@ -1,3 +1,4 @@
+#include "ConstexprAlgorithms.hpp"
 
 namespace UnitGuard
 {
@@ -12,7 +13,7 @@ struct Power
   using base_type = Base;
   static constexpr int exponent = Exp;
 
-  static_assert( std::is_base_of< BaseUnit, Base >::value, "Power: Base must inherit from AtomTag" );
+  static_assert( std::is_base_of< AtomTag, Base >::value, "Power: Base must inherit from AtomTag" );
 };
 
 // all Units we enforce compile-time constraints on are instantiations of "Unit", even non-composite units
@@ -34,38 +35,43 @@ struct Negate< Unit< Ps... > >
 
 // Merge.hpp -----------------------------------------------------------------------------
 
-// Forward declaration for internal helper that merges a single Power<B,E> into a Unit< Power<B_i, E_i>... >
-template < typename UnitT, typename Pow >
-struct MergePow;
+template < typename UnsortedUnit, typename Head >
+using PrependUnit = Prepend< Unit, UnsortedUnit, Head >;
 
-// MergePow when the Unit is empty -> just place the new Power
+template < typename UnitInstance, typename Pow >
+struct MergeUnits;
+
+// 1) Base case, the base unit was not already present in the `Unit`s pack
 template < typename Pow >
-struct MergePow< Unit< >, Pow >
+struct MergeUnits< Unit< >, Pow >
 {
   using type = Unit< Pow >;
 };
 
-// MergePow when the first element has the same base -> add exponents
+// 2) When the first element shares the same base unit -> sum their exponents
 template < typename Base, int E1, int E2, typename... Rest >
-struct MergePow< Unit< Power< Base, E1 >, Rest... >, Power< Base, E2 > >
+struct MergeUnits< Unit< Power< Base, E1 >, Rest... >, Power< Base, E2 > >
 {
 private:
   static constexpr int newExp = E1 + E2;
-  // If the sum is zero, we drop that base unit from the list
-  using merged_tail = std::conditional_t< newExp == 0, Unit< Rest... >, Unit< Power< Base, newExp >, Rest... > >;
+  // If the sum is zero, remove that base unit entirely
+  using merged_tail = std::conditional_t<
+    newExp == 0,
+    Unit< Rest... >,
+    Unit< Power< Base, newExp >, Rest... >
+  >;
 public:
   using type = merged_tail;
 };
 
-// MergePow when the first element has a different base -> keep going
+// 3) When the first element doesn't share the same base unit -> keep the head, recurse on the tail
 template < typename FirstPow, typename Pow, typename... Rest >
-struct MergePow< Unit< FirstPow, Rest... >, Pow >
+struct MergeUnits< Unit< FirstPow, Rest... >, Pow >
 {
 private:
-  using submerge = typename MergePow< Unit< Rest... >, Pow >::type;
+  using submerge = typename MergeUnits< Unit< Rest... >, Pow >::type;
 public:
-  // Reinsert `FirstPow` at the front
-  using type = Unit< FirstPow, typename submerge::Powers... >;
+  using type = typename PrependUnit< submerge, FirstPow >::type;
 };
 
 // -----------------------------------------------------------------------------
@@ -82,11 +88,11 @@ struct AddPack< U1, Unit< > >
 };
 
 // Recursively add each Power from second to the first
-template < typename U1, typename Pow, typename... Tail >
-struct AddPack< U1, Unit< Pow, Tail... > >
+template < typename P1, typename Pow, typename... Tail >
+struct AddPack< P1, Unit< Pow, Tail... > >
 {
 private:
-  using merged = typename MergePow< U1, Pow >::type;
+  using merged = typename MergeUnits< P1, Pow >::type;
 public:
   using type = typename AddPack< merged, Unit< Tail... > >::type;
 };
@@ -111,85 +117,29 @@ struct SubPack< U1, Unit< Pow, Tail... > >
 private:
   // Subtracting Power<Base, E> is the same as adding Power<Base, -E>
   using NegativePow = Power< typename Pow::base_type, -Pow::exponent >;
-  using merged = typename MergePow< U1, NegativePow >::type;
+  using merged = typename MergeUnits< U1, NegativePow >::type;
 public:
   using type = typename SubPack< merged, Unit< Tail... > >::type;
 };
 
 // Comparison.hpp -----------------------------------------------------------------------------
 
-
-
-// Appends `Head` in front of `Unit<Powers...>`
-template<typename UnitT, typename Head>
-struct Prepend;
-
-template<typename Head, typename... Powers>
-struct Prepend<Unit<Powers...>, Head>
-{
-    using type = Unit<Head, Powers...>;
-};
-
-
 // A simple trait that assigns each base type an integer “rank.”
 template< typename Tag >
 struct CanonicalOrder;
 
-template< typename P1, typename P2 >
-struct LessThan
+// The comparator uses CanonicalOrder< T >::value to compare.
+struct CanonicalUnitComparitor
 {
-  // P1 and P2 are each PowUnit<SomeBase, Exp>.
-  static constexpr bool value = ( CanonicalOrder< typename P1::base_type >::value < CanonicalOrder< typename P2::base_type >::value );
+  template< typename P1, typename P2 >
+  struct compare
+  {
+    static constexpr bool value = ( CanonicalOrder< typename P1::base_type >::value < CanonicalOrder< typename P2::base_type >::value );
+  };
 };
 
-// A minimal compile-time insertion sort:
-template< typename SortedList, typename Element >
-struct InsertSorted;  // forward declaration
-
-// Base case: Insert into an empty list
-template< typename Element >
-struct InsertSorted< Unit< >, Element >
-{
-  using type = Unit< Element >;
-};
-
-// Recursive: Compare with the first item of SortedList
-template< typename First, typename... Rest, typename Element >
-struct InsertSorted< Unit< First, Rest... >, Element >
-{
-  // Compare base orders: if Element < First, put Element in front
-  static constexpr bool insertHere = LessThan< Element, First >::value;
-  using TailSortedInsertion = typename InsertSorted< Unit< Rest... >, Element >::type;
-
-  using type = std::conditional_t<
-    insertHere,
-    // If we insert here: [Element, First, Rest...]
-    Unit< Element, First, Rest... >,
-    // Keep First, then insert Element into the tail
-    typename Prepend< TailSortedInsertion, First >::type
-  >;
-};
-
-template < typename UnsortedList >
-struct SortPowers;
-
-// Empty list is already sorted
-template < >
-struct SortPowers< Unit< > >
-{
-  using type = Unit< >;
-};
-
-// If there's at least one power: sort the tail, then insert the head
-template< typename First, typename... Rest >
-struct SortPowers< Unit< First, Rest... > >
-{
-private:
-  using SortedTail = typename SortPowers< Unit< Rest... > >::type;
-
-public:
-  using type = typename InsertSorted< SortedTail, First >::type;
-};
+template < typename UnsortedUnit >
+using CanonicalUnit = typename SortPack< Unit, CanonicalUnitComparitor, UnsortedUnit >::type;
 
 /// are_same_units< U1, U2> : check if two Unit<...> have the same (Base,Exp) pairs
 template < typename U1, typename U2 >
@@ -200,10 +150,10 @@ struct are_same_units< Unit< P1s... >, Unit< P2s... > >
 {
 private:
   // Sort both packs to canonical order
-  using U1Sorted = typename SortPowers< U1 >::type;
-  using U2Sorted = typename SortPowers< U2 >::type;
+  using CanonicalU1 = typename CanonicalUnit< Unit< P1s... > >::type;
+  using CanonicalU2 = typename CanonicalUnit<  Unit< P2s... > >::type;
 public:
-  static constexpr bool value = std::is_same< U1Sorted, U2Sorted >::value;
+  static constexpr bool value = std::is_same< CanonicalU1, CanonicalU2 >::value;
 };
 
 // -----------------------------------------------------------------------------
@@ -222,16 +172,16 @@ struct Divide
   using type = typename SubPack< U1, U2 >::type;
 };
 
-/// Invert<U> -> NegatePack
+/// Invert<U> -> Negate
 template< typename U >
 struct Invert
 {
-  using type = typename NegatePack< U >::type;
+  using type = typename Negate< U >::type;
 };
 
 // -----------------------------------------------------------------------------
 
-#define ENABLE_UNITGUARD 1;
+#define ENABLE_UNITGUARD 1
 #if ENABLE_UNITGUARD == 1
 template < typename T, typename U >
 class Quantity

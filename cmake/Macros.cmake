@@ -1,4 +1,4 @@
-macro(untiguard_add_code_checks)
+macro(unitguard_add_code_checks)
 
     set(options)
     set(singleValueArgs PREFIX UNCRUSTIFY_CFG_FILE )
@@ -69,4 +69,4 @@ macro(untiguard_add_code_checks)
                                      RUNNER ctest -E 'blt_gtest_smoke|testCppCheck|testClangTidy|testUncrustifyCheck|testDoxygenCheck|testCppCheck|testClangTidy'
                                      SOURCE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src )
     endif()
-endmacro(untiguard_add_code_checks)
+endmacro(unitguard_add_code_checks)
